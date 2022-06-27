@@ -1,5 +1,7 @@
 ﻿using ADO_Notifications.ADO;
+using ADO_Notifications.Notifications;
 using ADO_Notifications.Properties;
+using Microsoft.Toolkit.Uwp.Notifications;
 using Microsoft.VisualStudio.Services.Common;
 using Microsoft.Win32;
 using System;
@@ -15,7 +17,7 @@ namespace ADO_Notifications
         private readonly string _assemblyPath = Process.GetCurrentProcess().MainModule.FileName;
         private RegistryKey _startupKey = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
 
-        private bool StartWithWindows { get => _startupKey.GetValue(_assemblyPath) != null; set { if (value) { _startupKey?.SetValue(Title, $"\"{_assemblyPath}\""); } else { _startupKey?.DeleteValue(_assemblyPath, false); } } }
+        private bool StartWithWindows { get => _startupKey.GetValue(Title) != null; set { if (value) { _startupKey?.SetValue(Title, $"\"{_assemblyPath}\""); } else { _startupKey?.DeleteValue(_assemblyPath, false); } } }
 
         public MainWindow()
         {

@@ -6,7 +6,7 @@
         xmlns:tb="http://www.hardcodet.net/taskbar"
         xmlns:local="clr-namespace:ADO_Notifications"
         mc:Ignorable="d"
-        Title="ADO Notifications" Height="550" Width="600" Loaded="Window_Loaded" StateChanged="Window_StateChanged">
+        Title="ADO Notifications" Height="680" Width="600" Loaded="Window_Loaded" StateChanged="Window_StateChanged">
     <DockPanel>
         <tb:TaskbarIcon x:Name="TaskBarIcon_Main" Visibility="Visible" ToolTipText="ADO Notifications" IconSource="/azure-devops.ico" TrayLeftMouseUp="TaskBarIcon_Main_TrayLeftMouseUp">
             <tb:TaskbarIcon.ContextMenu>

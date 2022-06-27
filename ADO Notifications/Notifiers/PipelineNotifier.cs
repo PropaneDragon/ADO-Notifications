@@ -14,12 +14,15 @@ namespace ADO_Notifications.Notifiers
     {
         private readonly PipelineListener _pipelineListener = new();
 
+        private DateTime _nextFailureNotification = DateTime.UtcNow;
+
         public PipelineNotifier(NotificationHandler notificationHandler) : base(notificationHandler)
         {
             _pipelineListener.OnNewBuilds += PipelineListener_OnNewBuilds;
             _pipelineListener.OnSuccessfulBuild += PipelineListener_OnSuccessfulBuild;
             _pipelineListener.OnUnsuccessfulBuild += PipelineListener_OnUnsuccessfulBuild;
             _pipelineListener.OnBuildStatusChanged += PipelineListener_OnBuildStatusChanged;
+            _pipelineListener.OnError += PipelineListener_OnError;
 
             _pipelineListener.StartListening(TimeSpan.FromSeconds(2));
         }
@@ -43,6 +46,9 @@ namespace ADO_Notifications.Notifiers
             _ => "Unknown"
         };
 
+        private static string ConstructActionIdFromBuild(Build build) => build.Id.ToString();
+        private static string ConstructActionIdsFromBuilds(IEnumerable<Build> builds) => string.Join('@', builds.Select(build => ConstructActionIdFromBuild(build)));
+
         private void PipelineListener_OnUnsuccessfulBuild(object? sender, IEnumerable<Build> e)
         {
             var user = ConnectionHolder.User;
@@ -54,6 +60,7 @@ namespace ADO_Notifications.Notifiers
                 {
                     var title = $"{validBuilds.Count()} new builds have failed";
                     var subtitle = $"Click the button below to view them";
+                    var commonActionIds = ConstructActionIdsFromBuilds(validBuilds);
 
                     if (validBuilds.Count() == 1)
                     {
@@ -66,10 +73,12 @@ namespace ADO_Notifications.Notifiers
                         new ToastContentBuilder()
                         .AddText(title)
                         .AddText(subtitle)
+                        .AddArgument("action", "viewBuild")
+                        .AddArgument("ids", commonActionIds)
                         .AddButton(new ToastButton()
                             .SetContent("View")
                             .AddArgument("action", "viewBuild")
-                            .AddArgument("ids", string.Join('@', validBuilds.Select(build => build.Id))))
+                            .AddArgument("ids", commonActionIds))
                         );
                 }
             }
@@ -86,6 +95,7 @@ namespace ADO_Notifications.Notifiers
                 {
                     var title = $"{validBuilds.Count()} new builds have completed successfully";
                     var subtitle = $"Click the button below to view them";
+                    var commonActionIds = ConstructActionIdsFromBuilds(validBuilds);
 
                     if (validBuilds.Count() == 1)
                     {
@@ -98,10 +108,12 @@ namespace ADO_Notifications.Notifiers
                         new ToastContentBuilder()
                         .AddText(title)
                         .AddText(subtitle)
+                        .AddArgument("action", "viewBuild")
+                        .AddArgument("ids", commonActionIds)
                         .AddButton(new ToastButton()
                             .SetContent("View")
                             .AddArgument("action", "viewBuild")
-                            .AddArgument("ids", string.Join('@', validBuilds.Select(build => build.Id))))
+                            .AddArgument("ids", commonActionIds))
                         );
                 }
             }
@@ -118,6 +130,7 @@ namespace ADO_Notifications.Notifiers
                 {
                     var title = $"{validBuilds.Count()} new builds have started";
                     var subtitle = $"Click the button below to view them";
+                    var commonActionIds = ConstructActionIdsFromBuilds(validBuilds);
 
                     if (validBuilds.Count() == 1)
                     {
@@ -130,10 +143,12 @@ namespace ADO_Notifications.Notifiers
                         new ToastContentBuilder()
                         .AddText(title)
                         .AddText(subtitle)
+                        .AddArgument("action", "viewBuild")
+                        .AddArgument("ids", commonActionIds)
                         .AddButton(new ToastButton()
                             .SetContent("View")
                             .AddArgument("action", "viewBuild")
-                            .AddArgument("ids", string.Join('@', validBuilds.Select(build => build.Id))))
+                            .AddArgument("ids", commonActionIds))
                         );
                 }
             }
@@ -149,16 +164,32 @@ namespace ADO_Notifications.Notifiers
                 foreach (var statusChange in validStatuses)
                 {
                     var title = $"Build {statusChange.Item1.BuildNumber} changed from {ReadableStatus(statusChange?.Item2 ?? BuildStatus.None)} to {ReadableStatus(statusChange?.Item3 ?? BuildStatus.None)}";
+                    var commonActionId = ConstructActionIdFromBuild(statusChange.Item1);
 
                     NotificationHandler?.AddToast(
                         new ToastContentBuilder()
                         .AddText(title)
+                        .AddArgument("action", "viewBuild")
+                        .AddArgument("ids", commonActionId)
                         .AddButton(new ToastButton()
                             .SetContent("View")
                             .AddArgument("action", "viewBuild")
-                            .AddArgument("ids", statusChange.Item1.Id))
+                            .AddArgument("ids", commonActionId))
                         );
                 }
+            }
+        }
+
+        private void PipelineListener_OnError(object? _, Exception e)
+        {
+            if (DateTime.UtcNow > _nextFailureNotification)
+            {
+                NotificationHandler?.AddToast(
+                    new ToastContentBuilder()
+                    .AddText("An error occurred trying to retrieve pipeline information.")
+                    .AddText($"{e?.Message ?? ""}"));
+
+                _nextFailureNotification = DateTime.UtcNow.AddMinutes(30);
             }
         }
     }

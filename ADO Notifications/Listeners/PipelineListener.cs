@@ -55,60 +55,63 @@ namespace ADO_Notifications.Listeners
 
         protected override async Task TimeoutAsync()
         {
-            var activeBuilds = await GetBuildsInProgressAsync();
-
-            try
+            if (ConnectionHolder.Connection?.HasAuthenticated ?? false)
             {
-                if (activeBuilds != null)
+                var activeBuilds = await GetBuildsInProgressAsync();
+
+                try
                 {
-                    if (_initialised)
+                    if (activeBuilds != null)
                     {
-                        var linkedBuilds = activeBuilds.Select(build => (current: build, previous: _priorBuilds.FirstOrDefault(priorBuild => priorBuild.Id == build.Id)));
-                        var newBuilds = linkedBuilds.Where(linkedBuild => linkedBuild.previous == default(Build)).Select(linkedBuild => linkedBuild.current);
-                        var finishedBuilds = _priorBuilds.Where(priorBuild => !activeBuilds.Any(activeBuild => activeBuild.BuildNumber == priorBuild.BuildNumber));
-                        var buildStatusChanged = linkedBuilds.Where(linkedBuild => (linkedBuild.current != null) && (linkedBuild.previous != null) && (linkedBuild.current.Status != linkedBuild.previous.Status));
-
-                        if (newBuilds.Any())
+                        if (_initialised)
                         {
-                            OnNewBuilds?.Invoke(this, newBuilds);
-                        }
+                            var linkedBuilds = activeBuilds.Select(build => (current: build, previous: _priorBuilds.FirstOrDefault(priorBuild => priorBuild.Id == build.Id)));
+                            var newBuilds = linkedBuilds.Where(linkedBuild => linkedBuild.previous == default(Build)).Select(linkedBuild => linkedBuild.current);
+                            var finishedBuilds = _priorBuilds.Where(priorBuild => !activeBuilds.Any(activeBuild => activeBuild.BuildNumber == priorBuild.BuildNumber));
+                            var buildStatusChanged = linkedBuilds.Where(linkedBuild => (linkedBuild.current != null) && (linkedBuild.previous != null) && (linkedBuild.current.Status != linkedBuild.previous.Status));
 
-                        if (finishedBuilds.Any())
-                        {
-                            var updatedBuilds = await Task.WhenAll(finishedBuilds.Select(async build => await GetBuildAsync(build.Id)));
-                            var successfulBuilds = updatedBuilds.Where(build => build != null && (build.Result == BuildResult.Succeeded || build.Result == BuildResult.PartiallySucceeded));
-                            var unsuccessfulBuilds = updatedBuilds.Where(build => build != null && (build.Result == BuildResult.Failed || build.Result == BuildResult.Canceled));
-
-                            if (successfulBuilds.Any())
+                            if (newBuilds.Any())
                             {
-                                OnSuccessfulBuild?.Invoke(this, successfulBuilds);
+                                OnNewBuilds?.Invoke(this, newBuilds);
                             }
 
-                            if (unsuccessfulBuilds.Any())
+                            if (finishedBuilds.Any())
                             {
-                                OnUnsuccessfulBuild?.Invoke(this, unsuccessfulBuilds);
+                                var updatedBuilds = await Task.WhenAll(finishedBuilds.Select(async build => await GetBuildAsync(build.Id)));
+                                var successfulBuilds = updatedBuilds.Where(build => build != null && (build.Result == BuildResult.Succeeded || build.Result == BuildResult.PartiallySucceeded));
+                                var unsuccessfulBuilds = updatedBuilds.Where(build => build != null && (build.Result == BuildResult.Failed || build.Result == BuildResult.Canceled));
+
+                                if (successfulBuilds.Any())
+                                {
+                                    OnSuccessfulBuild?.Invoke(this, successfulBuilds);
+                                }
+
+                                if (unsuccessfulBuilds.Any())
+                                {
+                                    OnUnsuccessfulBuild?.Invoke(this, unsuccessfulBuilds);
+                                }
+                            }
+
+                            if (buildStatusChanged.Any())
+                            {
+                                OnBuildStatusChanged?.Invoke(this, buildStatusChanged.Select(build => new Tuple<Build, BuildStatus?, BuildStatus?>(build.current, build.previous.Status, build.current.Status)));
                             }
                         }
-
-                        if (buildStatusChanged.Any())
+                        else
                         {
-                            OnBuildStatusChanged?.Invoke(this, buildStatusChanged.Select(build => new Tuple<Build, BuildStatus?, BuildStatus?>(build.current, build.previous.Status, build.current.Status)));
+                            _initialised = true;
                         }
-                    }
-                    else
-                    {
-                        _initialised = true;
                     }
                 }
+                catch
+                {
+                    throw;
+                }
+                finally
+                {
+                    _priorBuilds = activeBuilds.ToList();
+                }
             }
-            catch
-            {
-                throw;
-            }
-            finally
-            {
-                _priorBuilds = activeBuilds.ToList();
-            }
-        }            
+        }
     }
 }

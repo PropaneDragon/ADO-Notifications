@@ -22,17 +22,13 @@ namespace ADO_Notifications
 
             _notifiers.Add(new PullRequestNotifier(NotificationHandler));
             _notifiers.Add(new PipelineNotifier(NotificationHandler));
+            _notifiers.Add(new ConnectionNotifier(NotificationHandler));
 
             if (!string.IsNullOrWhiteSpace(Settings.Default.AccessToken))
             {
                 try
                 {
-                    if (await ConnectionHolder.SetCredentialsAsync(new VssBasicCredential(string.Empty, Settings.Default.AccessToken)))
-                    {
-                        var user = ConnectionHolder.Connection.AuthorizedIdentity;
-                        NotificationHandler.AddToast(new ToastContentBuilder().AddText("Connected to ADO").AddText($"Hello {user.DisplayName}"));
-                    }
-                    else
+                    if (!await ConnectionHolder.SetCredentialsAsync(new VssBasicCredential(string.Empty, Settings.Default.AccessToken)))
                     {
                         NotificationHandler.AddToast(new ToastContentBuilder().AddText("Failed to connect to ADO"));
                     }

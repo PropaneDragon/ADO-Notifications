@@ -9,7 +9,7 @@ namespace ADO_Notifications.Notifications
 {
     internal class NotificationHandler : AbstractListener
     {
-        private readonly List<ToastContentBuilder> _toaster = new();
+        private readonly List<(ToastContentBuilder Toast, TimeSpan Timeout)> _toaster = new();
         private readonly object _toasterLock = new();
 
         private DateTime _nextToast = DateTime.Now;
@@ -18,11 +18,12 @@ namespace ADO_Notifications.Notifications
         {
         }
 
-        public void AddToast(ToastContentBuilder builder)
+        public void AddToast(ToastContentBuilder builder) => AddToast(TimeSpan.FromMinutes(60), builder);
+        public void AddToast(TimeSpan timeout, ToastContentBuilder builder)
         {
             lock (_toasterLock)
             {
-                _toaster.Add(builder);
+                _toaster.Add((builder, timeout));
             }
         }
 
@@ -31,9 +32,9 @@ namespace ADO_Notifications.Notifications
             lock (_toasterLock)
             {
                 var currentToast = _toaster.First();
-                if (currentToast != null)
+                if (currentToast.Toast != null)
                 {
-                    currentToast.Show(toast => toast.ExpirationTime = DateTimeOffset.Now.Add(TimeSpan.FromMinutes(60)));
+                    currentToast.Toast.Show(toast => toast.ExpirationTime = DateTimeOffset.Now.Add(currentToast.Timeout));
 
                     _ = _toaster.Remove(currentToast);
                 }
@@ -42,7 +43,7 @@ namespace ADO_Notifications.Notifications
 
         public void ShowWelcomeToast()
         {
-            AddToast(new ToastContentBuilder()
+            AddToast(TimeSpan.FromSeconds(10), new ToastContentBuilder()
                 .AddText("Notifications from ADO will appear here")
                 .AddText("You can change what type of notifications you get in the settings")
                 .AddButton(new ToastButton()

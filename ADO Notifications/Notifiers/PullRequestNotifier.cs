@@ -3,7 +3,6 @@ using ADO_Notifications.API;
 using ADO_Notifications.Listeners;
 using ADO_Notifications.Notifications;
 using ADO_Notifications.Properties;
-using Microsoft.TeamFoundation.Build.WebApi;
 using Microsoft.TeamFoundation.SourceControl.WebApi;
 using Microsoft.Toolkit.Uwp.Notifications;
 using System;
@@ -16,6 +15,8 @@ namespace ADO_Notifications.Notifiers
     {
         private readonly PullRequestListener _pullRequestListener = new();
 
+        private DateTime _nextFailureNotification = DateTime.UtcNow;
+
         public PullRequestNotifier(NotificationHandler notificationHandler) : base(notificationHandler)
         {
             _pullRequestListener.OnNewPullRequests += PullRequestListener_OnNewPullRequests;
@@ -26,6 +27,7 @@ namespace ADO_Notifications.Notifiers
             _pullRequestListener.OnSuccessfulPullRequest += PullRequestListener_OnSuccessfulPullRequest;
             _pullRequestListener.OnPullRequestReviewersAdded += PullRequestListener_OnPullRequestReviewersAdded;
             _pullRequestListener.OnPullRequestReviewersRemoved += PullRequestListener_OnPullRequestReviewersRemoved;
+            _pullRequestListener.OnError += PullRequestListener_OnError;
 
             _pullRequestListener.StartListening(TimeSpan.FromSeconds(10));
         }
@@ -38,13 +40,15 @@ namespace ADO_Notifications.Notifiers
             _ => "Unknown"
         };
 
-        private bool AnyReviewersAreCurrentUser(GitPullRequest? request) => ConnectionHolder.User != null && (request?.Reviewers?.Any(reviewer => ConnectionHolder.User.CompareRef(reviewer)) ?? false);
+        private static bool AnyReviewersAreCurrentUser(GitPullRequest? request) => ConnectionHolder.User != null && (request?.Reviewers?.Any(reviewer => ConnectionHolder.User.CompareRef(reviewer)) ?? false);
+        private static bool PullRequestIsCurrentUsers(GitPullRequest? request) => ConnectionHolder.User != null && ConnectionHolder.User.CompareRef(request?.CreatedBy);
 
-        private bool PullRequestIsCurrentUsers(GitPullRequest? request) => ConnectionHolder.User != null && ConnectionHolder.User.CompareRef(request?.CreatedBy);
-
-        private string ReadablePullRequestCreator(GitPullRequest? request) => request?.CreatedBy?.DisplayName ?? "Unknown";
-
-        private string ReadablePullRequestTitle(GitPullRequest? request) => request?.Title ?? "Unknown";
+        private static string ReadablePullRequestCreator(GitPullRequest? request) => request?.CreatedBy?.DisplayName ?? "Unknown";
+        private static string ReadablePullRequestTitle(GitPullRequest? request) => request?.Title ?? "Unknown";
+        private static string ConstructActionIdFromPullRequest(GitPullRequest pullRequest) => pullRequest.PullRequestId.ToString();
+        private static string ConstructActionIdsFromPullRequests(IEnumerable<GitPullRequest> pullRequests) => string.Join('@', pullRequests.Select(pullRequest => ConstructActionIdFromPullRequest(pullRequest)));
+        private static string ConstructActionUrlFromPullRequest(GitPullRequest pullRequest) => AzureUriBuilder.BuildProjectUri($"_git/{pullRequest.Repository?.Name ?? ""}/pullrequest/{pullRequest.PullRequestId}").ToString();
+        private static string ConstructActionUrlsFromPullRequests(IEnumerable<GitPullRequest?> pullRequests) => string.Join('@', pullRequests.Select(pullRequest => ConstructActionUrlFromPullRequest(pullRequest)));
 
         private void PullRequestListener_OnNewPullRequests(object? sender, IEnumerable<GitPullRequest> e)
         {
@@ -56,6 +60,8 @@ namespace ADO_Notifications.Notifiers
                 {
                     var title = $"{validPullRequests.Count()} pull requests have just been created";
                     var subtitle = $"Click the button below to view them";
+                    var sharedActionIds = ConstructActionIdsFromPullRequests(validPullRequests);
+                    var sharedActionUrls = ConstructActionUrlsFromPullRequests(validPullRequests);
 
                     if (validPullRequests.Count() == 1)
                     {
@@ -68,11 +74,14 @@ namespace ADO_Notifications.Notifiers
                         new ToastContentBuilder()
                         .AddText(title)
                         .AddText(subtitle)
+                        .AddArgument("action", "viewPr")
+                        .AddArgument("ids", sharedActionIds)
+                        .AddArgument("urls", sharedActionUrls)
                         .AddButton(new ToastButton()
                             .SetContent("View")
                             .AddArgument("action", "viewPr")
-                            .AddArgument("ids", string.Join('@', validPullRequests.Select(pullRequest => pullRequest.PullRequestId)))
-                            .AddArgument("urls", string.Join('@', e.Select(pullRequest => AzureUriBuilder.BuildProjectUri($"_git/{pullRequest.Repository?.Name ?? ""}/pullrequest/{pullRequest.PullRequestId}")))))
+                            .AddArgument("ids", sharedActionIds)
+                            .AddArgument("urls", sharedActionUrls))
                         );
                 }
             }
@@ -87,6 +96,8 @@ namespace ADO_Notifications.Notifiers
                 if (validPullRequests.Any())
                 {
                     var title = $"{validPullRequests.Count()} pull requests are awaiting your review";
+                    var sharedActionIds = ConstructActionIdsFromPullRequests(validPullRequests);
+                    var sharedActionUrls = ConstructActionUrlsFromPullRequests(validPullRequests);
 
                     if (validPullRequests.Count() == 1)
                     {
@@ -97,11 +108,14 @@ namespace ADO_Notifications.Notifiers
                     NotificationHandler?.AddToast(
                         new ToastContentBuilder()
                         .AddText(title)
+                        .AddArgument("action", "viewPr")
+                        .AddArgument("ids", sharedActionIds)
+                        .AddArgument("urls", sharedActionUrls)
                         .AddButton(new ToastButton()
                             .SetContent("View")
                             .AddArgument("action", "viewPr")
-                            .AddArgument("ids", string.Join('@', validPullRequests.Select(pullRequest => pullRequest.PullRequestId)))
-                            .AddArgument("urls", string.Join('@', validPullRequests.Select(pullRequest => AzureUriBuilder.BuildProjectUri($"_git/{pullRequest.Repository?.Name ?? ""}/pullrequest/{pullRequest.PullRequestId}")))))
+                            .AddArgument("ids", sharedActionIds)
+                            .AddArgument("urls", sharedActionUrls))
                         );
                 }
             }
@@ -120,16 +134,21 @@ namespace ADO_Notifications.Notifiers
                         var name = PullRequestIsCurrentUsers(pullRequest.Item1) ? "Your" : $"{ReadablePullRequestCreator(pullRequest.Item1)}'s";
                         var title = $"{name} pull request has changed from {ReadableStatus(pullRequest.Item2 ?? PullRequestStatus.NotSet)} to {ReadableStatus(pullRequest.Item3 ?? PullRequestStatus.NotSet)}";
                         var subtitle = $"{ReadablePullRequestTitle(pullRequest.Item1)}";
+                        var sharedActionId = ConstructActionIdFromPullRequest(pullRequest.Item1);
+                        var sharedActionUrl = ConstructActionUrlFromPullRequest(pullRequest.Item1);
 
                         NotificationHandler?.AddToast(
                         new ToastContentBuilder()
                         .AddText(title)
                         .AddText(subtitle)
+                        .AddArgument("action", "viewPr")
+                        .AddArgument("ids", sharedActionId)
+                        .AddArgument("urls", sharedActionUrl)
                         .AddButton(new ToastButton()
                             .SetContent("View")
                             .AddArgument("action", "viewPr")
-                            .AddArgument("ids", pullRequest.Item1.PullRequestId)
-                            .AddArgument("urls", AzureUriBuilder.BuildProjectUri($"_git/{pullRequest.Item1.Repository?.Name ?? ""}/pullrequest/{pullRequest.Item1.PullRequestId}").ToString()))
+                            .AddArgument("ids", sharedActionId)
+                            .AddArgument("urls", sharedActionUrl))
                         );
                     }
                 }
@@ -149,16 +168,21 @@ namespace ADO_Notifications.Notifiers
                         var name = PullRequestIsCurrentUsers(pullRequest) ? "your" : $"{ReadablePullRequestCreator(pullRequest)}'s";
                         var title = $"New changes have been pushed to {name} pull request";
                         var subtitle = $"{ReadablePullRequestTitle(pullRequest)}";
+                        var sharedActionId = ConstructActionIdFromPullRequest(pullRequest);
+                        var sharedActionUrl = ConstructActionUrlFromPullRequest(pullRequest);
 
                         NotificationHandler?.AddToast(
                         new ToastContentBuilder()
                         .AddText(title)
                         .AddText(subtitle)
+                        .AddArgument("action", "viewPr")
+                        .AddArgument("ids", sharedActionId)
+                        .AddArgument("urls", sharedActionUrl)
                         .AddButton(new ToastButton()
                             .SetContent("View")
                             .AddArgument("action", "viewPr")
-                            .AddArgument("ids", pullRequest.PullRequestId)
-                            .AddArgument("urls", AzureUriBuilder.BuildProjectUri($"_git/{pullRequest.Repository?.Name ?? ""}/pullrequest/{pullRequest.PullRequestId}").ToString()))
+                            .AddArgument("ids", sharedActionId)
+                            .AddArgument("urls", sharedActionUrl))
                         );
                     }
                 }
@@ -178,16 +202,21 @@ namespace ADO_Notifications.Notifiers
                         var name = PullRequestIsCurrentUsers(pullRequest) ? "Your" : $"{ReadablePullRequestCreator(pullRequest)}'s";
                         var title = $"{name} pull request has completed successfully ({ReadableStatus(pullRequest.Status)})";
                         var subtitle = $"{ReadablePullRequestTitle(pullRequest)}";
+                        var sharedActionId = ConstructActionIdFromPullRequest(pullRequest);
+                        var sharedActionUrl = ConstructActionUrlFromPullRequest(pullRequest);
 
                         NotificationHandler?.AddToast(
                         new ToastContentBuilder()
                         .AddText(title)
                         .AddText(subtitle)
+                        .AddArgument("action", "viewPr")
+                        .AddArgument("ids", sharedActionId)
+                        .AddArgument("urls", sharedActionUrl)
                         .AddButton(new ToastButton()
                             .SetContent("View")
                             .AddArgument("action", "viewPr")
-                            .AddArgument("ids", pullRequest.PullRequestId)
-                            .AddArgument("urls", AzureUriBuilder.BuildProjectUri($"_git/{pullRequest.Repository?.Name ?? ""}/pullrequest/{pullRequest.PullRequestId}").ToString()))
+                            .AddArgument("ids", sharedActionId)
+                            .AddArgument("urls", sharedActionUrl))
                         );
                     }
                 }
@@ -207,16 +236,21 @@ namespace ADO_Notifications.Notifiers
                         var name = PullRequestIsCurrentUsers(pullRequest) ? "Your" : $"{ReadablePullRequestCreator(pullRequest)}'s";
                         var title = $"{name} pull request has not completed successfully ({ReadableStatus(pullRequest.Status)})";
                         var subtitle = $"{ReadablePullRequestTitle(pullRequest)}";
+                        var sharedActionId = ConstructActionIdFromPullRequest(pullRequest);
+                        var sharedActionUrl = ConstructActionUrlFromPullRequest(pullRequest);
 
                         NotificationHandler?.AddToast(
                         new ToastContentBuilder()
                         .AddText(title)
                         .AddText(subtitle)
+                        .AddArgument("action", "viewPr")
+                        .AddArgument("ids", sharedActionId)
+                        .AddArgument("urls", sharedActionUrl)
                         .AddButton(new ToastButton()
                             .SetContent("View")
                             .AddArgument("action", "viewPr")
-                            .AddArgument("ids", pullRequest.PullRequestId)
-                            .AddArgument("urls", AzureUriBuilder.BuildProjectUri($"_git/{pullRequest.Repository?.Name ?? ""}/pullrequest/{pullRequest.PullRequestId}").ToString()))
+                            .AddArgument("ids", sharedActionId)
+                            .AddArgument("urls", sharedActionUrl))
                         );
                     }
                 }
@@ -235,16 +269,21 @@ namespace ADO_Notifications.Notifiers
                     {
                         var title = $"You have been added as a reviewer to {ReadablePullRequestCreator(pullRequest.Item1)}'s pull request";
                         var subtitle = $"{ReadablePullRequestTitle(pullRequest.Item1)}";
+                        var sharedActionId = ConstructActionIdFromPullRequest(pullRequest.Item1);
+                        var sharedActionUrl = ConstructActionUrlFromPullRequest(pullRequest.Item1);
 
                         NotificationHandler?.AddToast(
                         new ToastContentBuilder()
                         .AddText(title)
                         .AddText(subtitle)
+                        .AddArgument("action", "viewPr")
+                        .AddArgument("ids", sharedActionId)
+                        .AddArgument("urls", sharedActionUrl)
                         .AddButton(new ToastButton()
                             .SetContent("View")
                             .AddArgument("action", "viewPr")
-                            .AddArgument("ids", pullRequest.Item1.PullRequestId)
-                            .AddArgument("urls", AzureUriBuilder.BuildProjectUri($"_git/{pullRequest.Item1.Repository?.Name ?? ""}/pullrequest/{pullRequest.Item1.PullRequestId}").ToString()))
+                            .AddArgument("ids", sharedActionId)
+                            .AddArgument("urls", sharedActionUrl))
                         );
                     }
                 }
@@ -253,6 +292,19 @@ namespace ADO_Notifications.Notifiers
 
         private void PullRequestListener_OnPullRequestReviewersRemoved(object? sender, IEnumerable<Tuple<GitPullRequest, IEnumerable<IdentityRefWithVote>>> e)
         {
+        }
+
+        private void PullRequestListener_OnError(object? _, Exception e)
+        {
+            if (DateTime.UtcNow > _nextFailureNotification)
+            {
+                NotificationHandler?.AddToast(
+                    new ToastContentBuilder()
+                    .AddText("An error occurred trying to retrieve pull request information.")
+                    .AddText($"{e?.Message ?? ""}"));
+
+                _nextFailureNotification = DateTime.UtcNow.AddMinutes(30);
+            }
         }
     }
 }
