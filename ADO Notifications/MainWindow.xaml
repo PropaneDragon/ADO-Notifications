@@ -1,0 +1,73 @@
+﻿<Window x:Class="ADO_Notifications.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:tb="http://www.hardcodet.net/taskbar"
+        xmlns:local="clr-namespace:ADO_Notifications"
+        mc:Ignorable="d"
+        Title="ADO Notifications" Height="550" Width="600" Loaded="Window_Loaded" StateChanged="Window_StateChanged">
+    <DockPanel>
+        <tb:TaskbarIcon x:Name="TaskBarIcon_Main" Visibility="Visible" ToolTipText="ADO Notifications" IconSource="/azure-devops.ico" TrayLeftMouseUp="TaskBarIcon_Main_TrayLeftMouseUp">
+            <tb:TaskbarIcon.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Settings" Click="MenuItem_Settings_Click"  />
+                    <MenuItem Header="Close" Click="MenuItem_Close_Click" />
+                </ContextMenu>
+            </tb:TaskbarIcon.ContextMenu>
+        </tb:TaskbarIcon>
+        <DockPanel DockPanel.Dock="Bottom" Margin="12" LastChildFill="False">
+            <Button x:Name="Button_Save" DockPanel.Dock="Right" Padding="6" MinWidth="100" Content="Save" Click="Button_Save_Click" />
+        </DockPanel>
+        <ScrollViewer>
+            <StackPanel Margin="12">
+                <TextBlock FontSize="24" Text="Settings" />
+                <DockPanel Margin="12">
+                    <TextBlock Margin="0,0,12,0" DockPanel.Dock="Left" Text="Access token:" />
+                    <TextBox x:Name="Text_AccessToken" />
+                </DockPanel>
+                <DockPanel Margin="12">
+                    <CheckBox x:Name="Checkbox_StartWithWindows" IsChecked="True" Content="Start with Windows" />
+                </DockPanel>
+                <DockPanel Margin="12">
+                    <CheckBox x:Name="Checkbox_StartMinimised" IsChecked="False" Content="Start minimised" />
+                </DockPanel>
+                <DockPanel Margin="12">
+                    <CheckBox x:Name="Checkbox_MinimiseToTray" IsChecked="False" Content="Minimise to tray" />
+                </DockPanel>
+                <DockPanel Margin="12">
+                    <CheckBox x:Name="Checkbox_PullRequestReminder" IsChecked="True" Content="Remind me about any pull requests I haven't yet reviewed every " />
+                    <TextBox x:Name="Text_PullRequestReminderMinutes" Text="60" />
+                    <TextBlock Text=" minutes" />
+                </DockPanel>
+                <DockPanel Margin="12">
+                    <CheckBox x:Name="Checkbox_NotifyOnNewPullRequests" IsChecked="True" Content="Notify me when a new pull request gets made that I'm a reviewer on" />
+                </DockPanel>
+                <DockPanel Margin="32,0,32,12">
+                    <CheckBox x:Name="Checkbox_NotifyOnNewPullRequestsDrafts" Content="Include draft pull requests" />
+                </DockPanel>
+                <DockPanel Margin="12">
+                    <CheckBox x:Name="Checkbox_NotifyWhenAddedAsReviewer" IsChecked="True" Content="Notify me when I'm added as a reviewer to a pull request" />
+                </DockPanel>
+                <DockPanel Margin="12">
+                    <CheckBox x:Name="Checkbox_NotifyOnUpdatedPullRequests" IsChecked="True" Content="Notify me when a pull request gets updated" />
+                </DockPanel>
+                <DockPanel Margin="12">
+                    <CheckBox x:Name="Checkbox_NotifyOnNewBuilds" IsChecked="True" Content="Notify me when my builds start" />
+                </DockPanel>
+                <DockPanel Margin="12">
+                    <CheckBox x:Name="Checkbox_NotifyOnCompleteBuilds" IsChecked="True" Content="Notify me when my builds finish" />
+                </DockPanel>
+                <DockPanel Margin="32,0,32,12">
+                    <CheckBox DockPanel.Dock="Top" x:Name="Checkbox_NotifyOnFailedBuilds" IsChecked="True" Content="If it failed" />
+                </DockPanel>
+                <DockPanel Margin="32,0,32,12">
+                    <CheckBox DockPanel.Dock="Bottom" x:Name="Checkbox_NotifyOnSucceededBuilds" IsChecked="True" Content="If it succeeded" />
+                </DockPanel>
+                <DockPanel Margin="12">
+                    <CheckBox x:Name="Checkbox_NotifyOnBuildStatusChanges" IsChecked="True" Content="Notify me when my builds change state" />
+                </DockPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

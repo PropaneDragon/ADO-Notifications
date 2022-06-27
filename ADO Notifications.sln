@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31912.275
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ADO Notifications", "ADO Notifications\ADO Notifications.csproj", "{4024AFDE-D62A-4BB4-BB52-27B50AAA147D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{4024AFDE-D62A-4BB4-BB52-27B50AAA147D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4024AFDE-D62A-4BB4-BB52-27B50AAA147D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4024AFDE-D62A-4BB4-BB52-27B50AAA147D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4024AFDE-D62A-4BB4-BB52-27B50AAA147D}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {8BC13AA8-81DA-4C21-AD9F-CC3B88162EE4}
+	EndGlobalSection
+EndGlobal
